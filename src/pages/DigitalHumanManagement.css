@@ -1,0 +1,19 @@
+.digital-human-management {
+  width: 100%;
+}
+
+.tab-header {
+  margin-bottom: 24px;
+}
+
+.tab-header .ant-tabs-card > .ant-tabs-content {
+  margin-top: 0;
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+

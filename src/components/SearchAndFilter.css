@@ -1,0 +1,16 @@
+.search-filter-container {
+  background: #fafafa;
+  padding: 16px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.search-filter-container .ant-select-multiple .ant-select-selector {
+  min-height: 32px;
+}
+
+.search-filter-container .ant-select-multiple .ant-select-selection-item {
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
