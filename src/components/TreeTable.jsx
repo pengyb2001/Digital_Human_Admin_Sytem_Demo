@@ -128,9 +128,9 @@ function TreeTable({
         return (
           <Space size="small" align="center">
             <Avatar 
-              src={record.avatar} 
+              src={record.rowThumbnailOverride || record.avatar} 
               size={50}
-              icon={!record.avatar && <EyeOutlined />}
+              icon={!(record.rowThumbnailOverride || record.avatar) && <EyeOutlined />}
             />
             {hasImages && (
               <Button

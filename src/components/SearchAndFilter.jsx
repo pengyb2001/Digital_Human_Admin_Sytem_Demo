@@ -1,6 +1,7 @@
 import React from 'react'
 import { Row, Col, Input, Select, Tag } from 'antd'
 import { SearchOutlined } from '@ant-design/icons'
+import BatchKeySearchInput from './BatchKeySearchInput'
 import './SearchAndFilter.css'
 
 const { Option } = Select
@@ -46,21 +47,27 @@ function SearchAndFilter({ searchParams, onSearchChange, isPrivate }) {
     <div className="search-filter-container">
       <Row gutter={[16, 16]}>
         <Col span={isPrivate ? 6 : 8}>
-          <Input
-            placeholder="搜索 Face ID/主播名称/对外人物名称"
-            prefix={<SearchOutlined />}
-            value={searchParams.personSearch}
-            onChange={(e) => handleSearchChange('personSearch', e.target.value)}
-            allowClear
+          <BatchKeySearchInput
+            labelTitle="Face ID / 对外人物名 批量搜索"
+            placeholder="Face ID 或对外人物名，回车添加"
+            keys={searchParams.batchFaceIds || []}
+            onKeysChange={(v) => handleSearchChange('batchFaceIds', v)}
+            modalTitle="批量添加 Face ID / 对外人物名"
+            tagLabelPrefix="批量人物"
+            modalHint="每行一条，可为 Face ID 或对外人物名称；可与「已添加列表」合并，最多 500 条。"
+            pastePlaceholder="粘贴多行（Face ID 或对外人物名），每行一条"
           />
         </Col>
         <Col span={isPrivate ? 6 : 8}>
-          <Input
-            placeholder="搜索 形象Key/对外形象名称"
-            prefix={<SearchOutlined />}
-            value={searchParams.imageSearch}
-            onChange={(e) => handleSearchChange('imageSearch', e.target.value)}
-            allowClear
+          <BatchKeySearchInput
+            labelTitle="形象 Key / 对外形象名 批量搜索"
+            placeholder="形象 Key 或对外形象名，回车添加"
+            keys={searchParams.batchImageKeys || []}
+            onKeysChange={(v) => handleSearchChange('batchImageKeys', v)}
+            modalTitle="批量添加 形象Key / 对外形象名"
+            tagLabelPrefix="批量形象"
+            modalHint="每行一条，可为形象 Key 或对外形象名称；可与「已添加列表」合并，最多 500 条。"
+            pastePlaceholder="粘贴多行（形象 Key 或对外形象名），每行一条"
           />
         </Col>
         {isPrivate && (

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Card, Tabs, Button, message, Space } from 'antd'
+import React, { useState, useEffect, useRef } from 'react'
+import { Card, Tabs, Button, message, Space, Modal } from 'antd'
 import SearchAndFilter from '../components/SearchAndFilter'
 import TreeTable from '../components/TreeTable'
 import { mockData } from '../utils/mockData'
@@ -13,8 +13,8 @@ function DigitalHumanManagement() {
   const [data, setData] = useState([])
   const [filteredData, setFilteredData] = useState([])
   const [searchParams, setSearchParams] = useState({
-    personSearch: '',
-    imageSearch: '',
+    batchFaceIds: [],
+    batchImageKeys: [],
     customerSearch: '',
     format: 'all',
     authStatus: 'all',
@@ -32,6 +32,52 @@ function DigitalHumanManagement() {
   })
   const [expandedRows, setExpandedRows] = useState(new Set())
   const [selectedImageKeys, setSelectedImageKeys] = useState(new Set()) // 选中的形象key集合
+  const batchKeysNoticeRef = useRef('')
+
+  const normalizeKey = (s) => String(s).trim().toLowerCase()
+
+  // 批量 Key 中存在但当前库没有的项 → 提示过滤数量
+  useEffect(() => {
+    const f = searchParams.batchFaceIds || []
+    const i = searchParams.batchImageKeys || []
+    const sig = JSON.stringify({ f, i })
+    if (sig === batchKeysNoticeRef.current) return
+    batchKeysNoticeRef.current = sig
+
+    if (f.length === 0 && i.length === 0) return
+
+    const faceTokenMatchesPerson = (nk, person) =>
+      normalizeKey(person.faceId) === nk ||
+      (person.externalName && normalizeKey(person.externalName) === nk)
+
+    let invalidFace = 0
+    if (f.length > 0) {
+      invalidFace = f.filter(
+        (k) => !data.some((p) => faceTokenMatchesPerson(normalizeKey(k), p))
+      ).length
+    }
+
+    const imageTokenMatches = (nk, img) =>
+      normalizeKey(img.imageKey) === nk ||
+      (img.externalImageName && normalizeKey(img.externalImageName) === nk)
+
+    let invalidImg = 0
+    if (i.length > 0) {
+      invalidImg = i.filter(
+        (k) =>
+          !data.some((p) =>
+            p.images?.some((img) => imageTokenMatches(normalizeKey(k), img))
+          )
+      ).length
+    }
+
+    const parts = []
+    if (invalidFace > 0) parts.push(`${invalidFace} 条人物条件`)
+    if (invalidImg > 0) parts.push(`${invalidImg} 条形象条件`)
+    if (parts.length > 0) {
+      message.info(`已过滤 ${parts.join('、')}（数据中不存在）`)
+    }
+  }, [data, searchParams.batchFaceIds, searchParams.batchImageKeys])
 
   // 初始化数据
   useEffect(() => {
@@ -75,27 +121,43 @@ function DigitalHumanManagement() {
   useEffect(() => {
     let result = [...data]
 
-    // 人物搜索（Face ID/主播名称/对外人物名称，模糊匹配）
-    if (searchParams.personSearch) {
-      const search = searchParams.personSearch.toLowerCase()
-      result = result.filter(person => 
-        person.faceId.toLowerCase().includes(search) ||
-        person.internalName.toLowerCase().includes(search) ||
-        person.externalName.toLowerCase().includes(search)
-      )
+    const batchFace = (searchParams.batchFaceIds || [])
+      .map((k) => normalizeKey(k))
+      .filter(Boolean)
+    const batchImg = (searchParams.batchImageKeys || [])
+      .map((k) => normalizeKey(k))
+      .filter(Boolean)
+
+    if (batchFace.length > 0) {
+      const faceSet = new Set(batchFace)
+      result = result.filter((person) => {
+        if (faceSet.has(normalizeKey(person.faceId))) return true
+        if (person.externalName && faceSet.has(normalizeKey(person.externalName))) return true
+        return false
+      })
     }
 
-    // 形象搜索（形象Key/对外形象名称，模糊匹配）
-    if (searchParams.imageSearch) {
-      const search = searchParams.imageSearch.toLowerCase()
-      result = result.map(person => ({
-        ...person,
-        images: person.images.filter(img => 
-          img.imageKey.toLowerCase().includes(search) ||
-          img.externalImageName?.toLowerCase().includes(search)
-        )
-      })).filter(person => person.images.length > 0)
+    if (batchImg.length > 0) {
+      const imgSet = new Set(batchImg)
+      result = result
+        .map((person) => ({
+          ...person,
+          images: (person.images || []).filter((img) => {
+            if (imgSet.has(normalizeKey(img.imageKey))) return true
+            if (img.externalImageName && imgSet.has(normalizeKey(img.externalImageName))) return true
+            return false
+          })
+        }))
+        .filter((person) => person.images.length > 0)
     }
+
+    result = result.map((person) => ({
+      ...person,
+      rowThumbnailOverride:
+        batchImg.length > 0
+          ? person.images?.[0]?.thumbnail || person.avatar
+          : undefined
+    }))
 
     // 所属客户搜索（仅私有库）
     if (activeTab === 'private' && searchParams.customerSearch) {
@@ -286,19 +348,36 @@ function DigitalHumanManagement() {
   }
 
   const handleShelfStatusChange = (personId, imageId, newStatus) => {
-    setData(data.map(person => 
-      person.id === personId
-        ? {
-            ...person,
-            images: person.images.map(img =>
-              img.id === imageId 
-                ? { ...img, shelfStatus: newStatus }
-                : img
-            )
-          }
-        : person
-    ))
+    setData((prev) =>
+      prev.map((person) =>
+        person.id === personId
+          ? {
+              ...person,
+              images: person.images.map((img) =>
+                img.id === imageId ? { ...img, shelfStatus: newStatus } : img
+              )
+            }
+          : person
+      )
+    )
     message.success(`形象已${newStatus === 'shelved' ? '上架' : '下架'}`)
+  }
+
+  const applyBatchShelfStatus = (updates, newStatus) => {
+    if (updates.length === 0) return
+    const key = (u) => `${u.personId}:${u.imageId}`
+    const hit = new Set(updates.map(key))
+    setData((prev) =>
+      prev.map((person) => ({
+        ...person,
+        images: person.images.map((img) => {
+          if (hit.has(`${person.id}:${img.id}`)) {
+            return { ...img, shelfStatus: newStatus }
+          }
+          return img
+        })
+      }))
+    )
   }
 
   const handleExpand = (personId) => {
@@ -357,17 +436,11 @@ function DigitalHumanManagement() {
     }
   }
 
-  // 批量上架
-  const handleBatchShelve = () => {
-    if (selectedImageKeys.size === 0) {
-      message.warning('请先选择要上架的形象')
-      return
-    }
-
+  const collectShelveUpdates = () => {
     const updates = []
-    filteredData.forEach(person => {
+    filteredData.forEach((person) => {
       if (person.images) {
-        person.images.forEach(image => {
+        person.images.forEach((image) => {
           const key = `image-${image.id}`
           if (selectedImageKeys.has(key) && image.shelfStatus === 'unshelved') {
             updates.push({ personId: person.id, imageId: image.id })
@@ -375,18 +448,53 @@ function DigitalHumanManagement() {
         })
       }
     })
+    return updates
+  }
+
+  const collectUnshelveUpdates = () => {
+    const updates = []
+    filteredData.forEach((person) => {
+      if (person.images) {
+        person.images.forEach((image) => {
+          const key = `image-${image.id}`
+          if (selectedImageKeys.has(key) && image.shelfStatus === 'shelved') {
+            updates.push({ personId: person.id, imageId: image.id })
+          }
+        })
+      }
+    })
+    return updates
+  }
+
+  // 批量上架
+  const handleBatchShelve = () => {
+    if (selectedImageKeys.size === 0) {
+      message.warning('请先选择要上架的形象')
+      return
+    }
+
+    const updates = collectShelveUpdates()
 
     if (updates.length === 0) {
       message.warning('所选形象中没有可上架的项目')
       return
     }
 
-    updates.forEach(({ personId, imageId }) => {
-      handleShelfStatusChange(personId, imageId, 'shelved')
+    Modal.confirm({
+      title: '确认批量上架',
+      content: `将对 ${updates.length} 个形象执行上架操作，是否继续？`,
+      okText: '确认上架',
+      cancelText: '取消',
+      onOk: () => {
+        console.info('[批量上架]', {
+          count: updates.length,
+          items: updates.map((u) => ({ personId: u.personId, imageId: u.imageId }))
+        })
+        applyBatchShelfStatus(updates, 'shelved')
+        message.success(`成功上架 ${updates.length} 个形象`)
+        setSelectedImageKeys(new Set())
+      }
     })
-
-    message.success(`成功上架 ${updates.length} 个形象`)
-    setSelectedImageKeys(new Set())
   }
 
   // 批量下架
@@ -396,29 +504,28 @@ function DigitalHumanManagement() {
       return
     }
 
-    const updates = []
-    filteredData.forEach(person => {
-      if (person.images) {
-        person.images.forEach(image => {
-          const key = `image-${image.id}`
-          if (selectedImageKeys.has(key) && image.shelfStatus === 'shelved') {
-            updates.push({ personId: person.id, imageId: image.id })
-          }
-        })
-      }
-    })
+    const updates = collectUnshelveUpdates()
 
     if (updates.length === 0) {
       message.warning('所选形象中没有可下架的项目')
       return
     }
 
-    updates.forEach(({ personId, imageId }) => {
-      handleShelfStatusChange(personId, imageId, 'unshelved')
+    Modal.confirm({
+      title: '确认批量下架',
+      content: `将对 ${updates.length} 个形象执行下架操作，是否继续？`,
+      okText: '确认下架',
+      cancelText: '取消',
+      onOk: () => {
+        console.info('[批量下架]', {
+          count: updates.length,
+          items: updates.map((u) => ({ personId: u.personId, imageId: u.imageId }))
+        })
+        applyBatchShelfStatus(updates, 'unshelved')
+        message.success(`成功下架 ${updates.length} 个形象`)
+        setSelectedImageKeys(new Set())
+      }
     })
-
-    message.success(`成功下架 ${updates.length} 个形象`)
-    setSelectedImageKeys(new Set())
   }
 
   return (

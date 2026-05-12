@@ -1,0 +1,68 @@
+.batch-key-search-input {
+  width: 100%;
+}
+
+.batch-key-search-input-inner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  min-height: 32px;
+  padding: 2px 8px 2px 4px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.batch-key-search-input-inner:focus-within {
+  border-color: #4096ff;
+  box-shadow: 0 0 0 2px rgba(5, 145, 255, 0.1);
+}
+
+.batch-key-search-tag {
+  cursor: pointer;
+  margin-inline-end: 0 !important;
+  flex-shrink: 0;
+}
+
+.batch-key-search-field {
+  flex: 1;
+  min-width: 120px;
+}
+
+.batch-key-search-field.ant-input {
+  padding-left: 4px;
+}
+
+.batch-key-modal-hint {
+  margin-bottom: 12px;
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 13px;
+}
+
+.batch-key-modal-section-title {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.batch-key-modal-list {
+  min-height: 40px;
+  max-height: 160px;
+  overflow: auto;
+  padding: 8px;
+  background: #fafafa;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.batch-key-modal-empty {
+  color: #999;
+  font-size: 13px;
+}
+
+.batch-key-modal-footer-count {
+  font-size: 13px;
+  color: #666;
+}
